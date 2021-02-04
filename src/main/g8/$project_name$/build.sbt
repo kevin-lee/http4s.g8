@@ -1,3 +1,5 @@
+import com.typesafe.sbt.packager.archetypes.systemloader.ServerLoader.SystemV
+import just.semver.SemVer
 import SbtProjectInfo._
 
 ThisBuild / scalaVersion := "$scalaVersion$"
@@ -28,7 +30,6 @@ lazy val root = (project in file("."))
   .settings(noPublish)
 
 lazy val core = projectCommonSettings("core", ProjectName("core"), file("core"))
-  .enablePlugins(BuildInfoPlugin)
   .settings(
     libraryDependencies ++=
       libs.circe
@@ -46,7 +47,7 @@ lazy val app = projectCommonSettings("cli", ProjectName("app"), file("app"))
   .enablePlugins(JavaAppPackaging)
   .settings(debianPackageInfo: _*)
   .settings(
-    maintainer := "Kevin Lee <kevin.code@kevinlee.io>"
+    maintainer := "$author_name$ <$author_email$>"
   )
   .dependsOn(
     core % props.IncludeTest,
@@ -149,7 +150,7 @@ def projectCommonSettings(id: String, projectName: ProjectName, file: File): Pro
         Resolver.sonatypeRepo("releases")
       ),
       libraryDependencies ++=
-        libs.hedgehogLibs ++ Seq(libs.newtype) ++ libs.refined ++ libs.catsAndCatsEffect ++ libs.effectie
+        libs.hedgehogLibs ++ Seq(libs.newtype) ++ libs.refined ++ libs.catsAndCatsEffect
       /* WartRemover and scalacOptions { */
       //      , wartremoverErrors in (Compile, compile) ++= commonWarts((scalaBinaryVersion in update).value)
       //      , wartremoverErrors in (Test, compile) ++= commonWarts((scalaBinaryVersion in update).value)
@@ -177,6 +178,13 @@ def projectCommonSettings(id: String, projectName: ProjectName, file: File): Pro
       /* Ammonite-REPL { */
 
     )
+
+lazy val debianPackageInfo: Seq[SettingsDefinition] = Seq(
+  maintainer in Linux := "$author_name$ <$author_email$>",
+  packageSummary in Linux := "My App",
+  packageDescription := "My app is ...",
+  serverLoading in Debian := Some(SystemV),
+)
 
 lazy val noPublish: SettingsDefinition = Seq(
   publish := {},
