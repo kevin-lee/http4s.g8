@@ -1,11 +1,9 @@
 import com.typesafe.sbt.packager.archetypes.systemloader.ServerLoader.SystemV
-import just.semver.SemVer
-import SbtProjectInfo._
 
-ThisBuild / scalaVersion := "$scalaVersion$"
-ThisBuild / version := SbtProjectInfo.ProjectVersion
-ThisBuild / organization := "$organization$"
-ThisBuild / organizationName := "$organizationName$"
+ThisBuild / scalaVersion := props.ScalaVersion
+ThisBuild / version := props.ProjectVersion
+ThisBuild / organization := props.Org
+ThisBuild / organizationName := props.OrgName
 ThisBuild / developers := List(
   Developer(
     props.GitHubUsername,
@@ -28,24 +26,27 @@ lazy val root = (project in file("."))
     name := props.ProjectName
   )
   .settings(noPublish)
+  .aggregate(core, http, app)
 
-lazy val core = projectCommonSettings("core", ProjectName("core"), file("core"))
+lazy val core = projectCommonSettings("core", file("core"))
   .settings(
-    libraryDependencies ++=
-      libs.circe
+    libraryDependencies ++= libs.circe,
+  )
+  .dependsOn(
+    core % props.IncludeTest,
   )
 
-lazy val http = projectCommonSettings("http", ProjectName("http"), file("http"))
+lazy val http = projectCommonSettings("http", file("http"))
   .settings(
     libraryDependencies ++=
       libs.circe ++
-        Seq(libs.log4s) ++
+        List(libs.log4s) ++
         libs.http4sClient
   )
 
-lazy val app = projectCommonSettings("cli", ProjectName("app"), file("app"))
+lazy val app = projectCommonSettings("app", file("app"))
   .enablePlugins(JavaAppPackaging)
-  .settings(debianPackageInfo: _*)
+  .settings(debianPackageInfo)
   .settings(
     maintainer := "$author_name$ <$author_email$>"
   )
@@ -56,9 +57,14 @@ lazy val app = projectCommonSettings("cli", ProjectName("app"), file("app"))
 
 lazy val props                                   =
   new {
+    val ScalaVersion = "$scalaVersion$"
+    val Org          = "$organization$"
+    val OrgName      = "$organizationName$"
+
     val GitHubUsername = "$github_username$"
     val RepoName       = "$repo_name$"
     val ProjectName    = "$project_name$"
+    val ProjectVersion = "0.1.0-SNAPSHOT"
 
     val newtypeVersion = "$newtype_version$"
     val refinedVersion = "$refined_version$"
@@ -85,7 +91,7 @@ val removeDottyIncompatible: ModuleID => Boolean =
 
 lazy val libs =
   new {
-    lazy val hedgehogLibs: Seq[ModuleID] = Seq(
+    lazy val hedgehogLibs: Seq[ModuleID] = List(
       "qa.hedgehog" %% "hedgehog-core"   % props.hedgehogVersion % Test,
       "qa.hedgehog" %% "hedgehog-runner" % props.hedgehogVersion % Test,
       "qa.hedgehog" %% "hedgehog-sbt"    % props.hedgehogVersion % Test,
@@ -93,26 +99,26 @@ lazy val libs =
 
     lazy val newtype = "io.estatico" %% "newtype" % props.newtypeVersion
 
-    lazy val refined = Seq(
+    lazy val refined = List(
       "eu.timepit" %% "refined"      % props.refinedVersion,
       "eu.timepit" %% "refined-cats" % props.refinedVersion,
     )
 
-    lazy val catsAndCatsEffect = Seq(
+    lazy val catsAndCatsEffect = List(
       "org.typelevel" %% "cats-core"   % props.catsVersion,
       "org.typelevel" %% "cats-effect" % props.catsEffectVersion,
     )
 
     lazy val log4s = "org.log4s" %% "log4s" % props.log4sVersion
 
-    lazy val http4sClient = Seq(
+    lazy val http4sClient = List(
       "org.http4s" %% "http4s-blaze-server" % props.http4sVersion,
       "org.http4s" %% "http4s-circe"        % props.http4sVersion,
       "org.http4s" %% "http4s-dsl"          % props.http4sVersion,
       "org.http4s" %% "http4s-blaze-client" % props.http4sVersion,
     )
 
-    lazy val circe = Seq(
+    lazy val circe = List(
       "io.circe" %% "circe-generic" % props.circeVersion,
       "io.circe" %% "circe-literal" % props.circeVersion,
       "io.circe" %% "circe-refined" % props.circeVersion,
@@ -124,73 +130,30 @@ lazy val libs =
 def prefixedProjectName(name: String) = s"\${props.RepoName}\${if (name.isEmpty) "" else s"-\$name"}"
 // format: on
 
-def scalacOptionsPostProcess(scalaSemVer: SemVer, options: Seq[String]): Seq[String] =
-  scalaSemVer match {
-    case SemVer(SemVer.Major(2), SemVer.Minor(13), SemVer.Patch(patch), _, _) =>
-      ((if (patch >= 3) {
-          options.distinct.filterNot(_ == "-Xlint:nullary-override")
-        } else {
-          options.distinct
-        }) ++ Seq("-Ymacro-annotations", "-language:implicitConversions")).distinct
-    case _: SemVer                                                            =>
-      options.distinct
-  }
-
-def projectCommonSettings(id: String, projectName: ProjectName, file: File): Project =
-  Project(id, file)
+def projectCommonSettings(projectName: String, file: File): Project =
+  Project(projectName, file)
     .settings(
-      name := prefixedProjectName(projectName.projectName),
+      name := prefixedProjectName(projectName),
       addCompilerPlugin("org.typelevel" % "kind-projector"     % "0.11.3" cross CrossVersion.full),
       addCompilerPlugin("com.olegpy"   %% "better-monadic-for" % "0.3.1"),
-      scalacOptions := scalacOptionsPostProcess(
-        SemVer.parseUnsafe(scalaVersion.value),
-        scalacOptions.value,
-      ),
-      resolvers ++= Seq(
-        Resolver.sonatypeRepo("releases")
-      ),
       libraryDependencies ++=
-        libs.hedgehogLibs ++ Seq(libs.newtype) ++ libs.refined ++ libs.catsAndCatsEffect
-      /* WartRemover and scalacOptions { */
-      //      , wartremoverErrors in (Compile, compile) ++= commonWarts((scalaBinaryVersion in update).value)
-      //      , wartremoverErrors in (Test, compile) ++= commonWarts((scalaBinaryVersion in update).value)
-      ,
-      wartremoverErrors ++= commonWarts((scalaBinaryVersion in update).value)
-      //      , wartremoverErrors ++= Warts.all
-      ,
-      Compile / console / wartremoverErrors := List.empty,
-      Compile / console / wartremoverWarnings := List.empty,
-      Compile / console / scalacOptions :=
-        (console / scalacOptions)
-          .value
-          .distinct
-          .filterNot(option => option.contains("wartremover") || option.contains("import")),
-      Test / console / wartremoverErrors := List.empty,
-      Test / console / wartremoverWarnings := List.empty,
-      Test / console / scalacOptions :=
-        (console / scalacOptions)
-          .value
-          .distinct
-          .filterNot(option => option.contains("wartremover") || option.contains("import"))
-      /* } WartRemover and scalacOptions */,
-      testFrameworks ++= Seq(TestFramework("hedgehog.sbt.Framework")),
-
-      /* Ammonite-REPL { */
-
+        libs.hedgehogLibs ++ List(libs.newtype) ++ libs.refined ++ libs.catsAndCatsEffect,
+      testFrameworks ~= (testFws => (TestFramework("hedgehog.sbt.Framework") +: testFws).distinct),
     )
 
-lazy val debianPackageInfo: Seq[SettingsDefinition] = Seq(
+lazy val debianPackageInfo: SettingsDefinition = List(
   maintainer in Linux := "$author_name$ <$author_email$>",
   packageSummary in Linux := "My App",
   packageDescription := "My app is ...",
   serverLoading in Debian := Some(SystemV),
 )
 
-lazy val noPublish: SettingsDefinition = Seq(
+lazy val noPublish: SettingsDefinition = List(
   publish := {},
+  publishM2 := {},
   publishLocal := {},
   publishArtifact := false,
-  skip in sbt.Keys.`package` := true,
-  skip in packagedArtifacts := true,
-  skip in publish := true,
+  sbt.Keys.`package` / skip := true,
+  packagedArtifacts / skip := true,
+  publish / skip := true,
 )
