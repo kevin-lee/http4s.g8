@@ -26,33 +26,37 @@ lazy val root = (project in file("."))
     name := props.ProjectName
   )
   .settings(noPublish)
-  .aggregate(core, http, app)
+  .aggregate(core, service, http, app)
 
-lazy val core = projectCommonSettings("core", file("core"))
+lazy val core = subProject("core", file("core"))
   .settings(
-    libraryDependencies ++= libs.circe,
+    libraryDependencies ++= libs.pureconfig :: libs.circe
+  )
+
+lazy val service = subProject("service", file("service"))
+  .dependsOn(
+    core % props.IncludeTest
+  )
+
+lazy val http = subProject("http", file("http"))
+  .settings(
+    libraryDependencies ++= List(libs.log4s, libs.logback) ++ libs.http4s
   )
   .dependsOn(
-    core % props.IncludeTest,
+    core    % props.IncludeTest,
+    service % props.IncludeTest,
   )
 
-lazy val http = projectCommonSettings("http", file("http"))
-  .settings(
-    libraryDependencies ++=
-      libs.circe ++
-        List(libs.log4s) ++
-        libs.http4sClient
-  )
-
-lazy val app = projectCommonSettings("app", file("app"))
+lazy val app = subProject("app", file("app"))
   .enablePlugins(JavaAppPackaging)
   .settings(debianPackageInfo)
   .settings(
     maintainer := "$author_name$ <$author_email$>"
   )
   .dependsOn(
-    core % props.IncludeTest,
-    http % props.IncludeTest,
+    core    % props.IncludeTest,
+    service % props.IncludeTest,
+    http    % props.IncludeTest,
   )
 
 lazy val props                                   =
@@ -74,11 +78,14 @@ lazy val props                                   =
     val catsVersion       = "$cats_version$"
     val catsEffectVersion = "$cats_effect_version$"
 
+    val pureconfig = "$pureconfig_version$"
+
     val circeVersion = "$circe_version$"
 
     val http4sVersion = "$http4s_version$"
 
     val log4sVersion = "$log4s_version$"
+    val logbackVersion = "$logback_version$"
 
     val IncludeTest: String = "compile->compile;test->test"
   }
@@ -100,8 +107,9 @@ lazy val libs =
     lazy val newtype = "io.estatico" %% "newtype" % props.newtypeVersion
 
     lazy val refined = List(
-      "eu.timepit" %% "refined"      % props.refinedVersion,
-      "eu.timepit" %% "refined-cats" % props.refinedVersion,
+      "eu.timepit" %% "refined"            % props.refinedVersion,
+      "eu.timepit" %% "refined-cats"       % props.refinedVersion,
+      "eu.timepit" %% "refined-pureconfig" % props.refinedVersion,
     )
 
     lazy val catsAndCatsEffect = List(
@@ -109,9 +117,10 @@ lazy val libs =
       "org.typelevel" %% "cats-effect" % props.catsEffectVersion,
     )
 
-    lazy val log4s = "org.log4s" %% "log4s" % props.log4sVersion
+    lazy val log4s   = "org.log4s"     %% "log4s"           % props.log4sVersion
+    lazy val logback = "ch.qos.logback" % "logback-classic" % props.logbackVersion
 
-    lazy val http4sClient = List(
+    lazy val http4s = List(
       "org.http4s" %% "http4s-blaze-server" % props.http4sVersion,
       "org.http4s" %% "http4s-circe"        % props.http4sVersion,
       "org.http4s" %% "http4s-dsl"          % props.http4sVersion,
@@ -124,28 +133,31 @@ lazy val libs =
       "io.circe" %% "circe-refined" % props.circeVersion,
     )
 
+    lazy val pureconfig = "com.github.pureconfig" %% "pureconfig" % props.pureconfig
+
   }
 
 // format: off
 def prefixedProjectName(name: String) = s"\${props.RepoName}\${if (name.isEmpty) "" else s"-\$name"}"
 // format: on
 
-def projectCommonSettings(projectName: String, file: File): Project =
+def subProject(projectName: String, file: File): Project =
   Project(projectName, file)
     .settings(
       name := prefixedProjectName(projectName),
       addCompilerPlugin("org.typelevel" % "kind-projector"     % "0.11.3" cross CrossVersion.full),
       addCompilerPlugin("com.olegpy"   %% "better-monadic-for" % "0.3.1"),
+      scalacOptions ~= (opts => ("-Ymacro-annotations" +: opts).distinct),
       libraryDependencies ++=
         libs.hedgehogLibs ++ List(libs.newtype) ++ libs.refined ++ libs.catsAndCatsEffect,
       testFrameworks ~= (testFws => (TestFramework("hedgehog.sbt.Framework") +: testFws).distinct),
     )
 
 lazy val debianPackageInfo: SettingsDefinition = List(
-  maintainer in Linux := "$author_name$ <$author_email$>",
-  packageSummary in Linux := "My App",
+  Linux / maintainer := "$author_name$ <$author_email$>",
+  Linux / packageSummary := "My App",
   packageDescription := "My app is ...",
-  serverLoading in Debian := Some(SystemV),
+  Debian / serverLoading := Some(SystemV),
 )
 
 lazy val noPublish: SettingsDefinition = List(
