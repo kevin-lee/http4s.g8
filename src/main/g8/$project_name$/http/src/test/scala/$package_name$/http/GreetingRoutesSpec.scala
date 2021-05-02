@@ -13,11 +13,11 @@ import org.http4s.{Method, Request, Status, Uri}
 object GreetingRoutesSpec extends Properties {
 
   override def tests: List[Test] = List(
-    property("testGreetingRoutes.GET.greet", testGreetingRoutesGetHello),
+    property("testGreetingRoutes.GET.greet", testGreetingRoutesGetGreet),
   )
 
-  def testGreetingRoutesGetHello: Property = for {
-    message    <- Gens.genNonEmptyString(Gen.alpha, 50).log("message")
+  def testGreetingRoutesGetGreet: Property = for {
+    message <- Gens.genNonEmptyString(Gen.alpha, 50).log("message")
     name    <- Gens.genNonEmptyString(Gen.alpha, 50).log("name")
   } yield {
     val greeter        = Greeter[IO]

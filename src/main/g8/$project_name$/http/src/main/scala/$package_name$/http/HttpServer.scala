@@ -1,11 +1,12 @@
 package $package_name$.http
 
 import syntax.all._
+import cats.syntax.all._
 import cats.effect._
 import fs2.Stream
-import $package_name$.core.Data.Greeting
+import $package_name$.core.Data._
 import $package_name$.config.AppConfig
-import $package_name$.service.Greeter
+import $package_name$.service.{Greeter, Welcomer}
 import org.http4s.server.blaze.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 import org.http4s.syntax.all._
@@ -33,11 +34,16 @@ object HttpServer {
     ): Stream[F, ExitCode] = {
       for {
         greeter  <- streamPureF(Greeter[F])
+        welcomer <- streamPureF(Welcomer[F](Where(appConfig.welcome.to.where)))
         routes   <- streamPureF(
-            GreetingRoutes[F](
-              Greeting.Message(appConfig.greeting.message.message),
-              greeter
-            ).routes.orNotFound
+            (
+              GreetingRoutes[F](
+                Greeting.Message(appConfig.greeting.message.message),
+                greeter
+              ).routes <+> WelcomeRoutes[F](
+                welcomer
+              ).routes
+            ).orNotFound
           )
         httpApp  =
           Logger.httpApp(

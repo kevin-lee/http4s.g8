@@ -42,11 +42,11 @@ object AppConfig {
     }
   }
 
-  final case class WelcomeConfig(message: WelcomeConfig.Message)
+  final case class WelcomeConfig(to: WelcomeConfig.Where)
   object WelcomeConfig {
-    @newtype case class Message(message: NonEmptyString)
-    object Message {
-      implicit val configReader: ConfigReader[Message] = deriving
+    @newtype case class Where(where: NonEmptyString)
+    object Where {
+      implicit val configReader: ConfigReader[Where] = deriving
     }
   }
 

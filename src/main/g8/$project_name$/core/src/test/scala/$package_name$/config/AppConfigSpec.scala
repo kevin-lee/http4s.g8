@@ -81,17 +81,15 @@ object AppConfigSpec extends Properties {
   }
 
   def testWelcomeConfig: Property = for {
-    message <- Gens.genNonEmptyString(Gen.alpha, 20).log("message")
+    to <- Gens.genNonEmptyString(Gen.alpha, 20).log("to")
   } yield {
     final case class ExpectedConfig(
       welcome: WelcomeConfig
     )
-    val expected = ExpectedConfig(WelcomeConfig(WelcomeConfig.Message(message)))
+    val expected = ExpectedConfig(WelcomeConfig(WelcomeConfig.Where(to)))
     val config   = ConfigSource.string(
       s"""
-         |welcome {
-         |  message: "\${message.value}"
-         |}
+         |welcome.to: "\${to.value}"
          |""".stripMargin
     )
     config.load[ExpectedConfig] match {
@@ -106,11 +104,9 @@ object AppConfigSpec extends Properties {
     final case class ExpectedConfig(
       welcome: WelcomeConfig
     )
-    val config   = ConfigSource.string(
+    val config = ConfigSource.string(
       s"""
-         |welcome {
-         |  message: ""
-         |}
+         |welcome.to: ""
          |""".stripMargin
     )
     config.load[ExpectedConfig] match {
@@ -122,8 +118,8 @@ object AppConfigSpec extends Properties {
         Result.all(
           List(
             Result
-              .assert(failureMessage.contains("welcome.message"))
-              .log("Expected failure at welcome.message but didn't find"),
+              .assert(failureMessage.contains("welcome.to"))
+              .log("Expected failure at welcome.to but didn't find"),
           )
         )
     }
@@ -182,12 +178,12 @@ object AppConfigSpec extends Properties {
     ipString <- Gens.genIpV4.log("ipString")
     portNum  <- Gens.genPortNumber.log("portNum")
     greetingMessage  <- Gens.genNonEmptyString(Gen.alpha, 20).log("greetingMessage")
-    welcomeMessage  <- Gens.genNonEmptyString(Gen.alpha, 20).log("welcomeMessage")
+    to  <- Gens.genNonEmptyString(Gen.alpha, 20).log("to")
   } yield {
     val expected = AppConfig(
       ServerConfig(ServerConfig.HostAddress(ipString), ServerConfig.PortNumber(portNum)),
       GreetingConfig(GreetingConfig.Message(greetingMessage)),
-      WelcomeConfig(WelcomeConfig.Message(welcomeMessage)),
+      WelcomeConfig(WelcomeConfig.Where(to)),
     )
     val config   = ConfigSource.string(
       s"""server {
@@ -197,9 +193,7 @@ object AppConfigSpec extends Properties {
          |greeting {
          |  message: "\${greetingMessage.value}"
          |}
-         |welcome {
-         |  message: "\${welcomeMessage.value}"
-         |}
+         |welcome.to: "\${to.value}"
          |""".stripMargin
     )
     config.load[AppConfig] match {
@@ -222,9 +216,7 @@ object AppConfigSpec extends Properties {
          |greeting {
          |  message: ""
          |}
-         |welcome {
-         |  message: ""
-         |}
+         |welcome.to: ""
          |""".stripMargin
     )
     config.load[AppConfig] match {
@@ -245,8 +237,8 @@ object AppConfigSpec extends Properties {
               .assert(failureMessage.contains("greeting.message"))
               .log("Expected failure at greeting.message but didn't find"),
             Result
-              .assert(failureMessage.contains("welcome.message"))
-              .log("Expected failure at welcome.message but didn't find"),
+              .assert(failureMessage.contains("welcome.to"))
+              .log("Expected failure at welcome.to but didn't find"),
           )
         )
     }
