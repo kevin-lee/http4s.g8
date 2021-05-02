@@ -12,6 +12,7 @@ import pureconfig.generic.auto._
 final case class AppConfig(
   server: AppConfig.ServerConfig,
   greeting: AppConfig.GreetingConfig,
+  welcome: AppConfig.WelcomeConfig,
 )
 
 object AppConfig {
@@ -38,6 +39,14 @@ object AppConfig {
     @newtype case class Message(message: NonEmptyString)
     object Message {
       implicit val configReader: ConfigReader[Message] = deriving
+    }
+  }
+
+  final case class WelcomeConfig(to: WelcomeConfig.Where)
+  object WelcomeConfig {
+    @newtype case class Where(where: NonEmptyString)
+    object Where {
+      implicit val configReader: ConfigReader[Where] = deriving
     }
   }
 
