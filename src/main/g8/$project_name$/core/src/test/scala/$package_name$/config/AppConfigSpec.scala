@@ -4,7 +4,7 @@ import eu.timepit.refined.auto._
 import hedgehog._
 import hedgehog.runner._
 import $package_name$.Gens
-import $package_name$.config.AppConfig.{GreetingConfig, ServerConfig}
+import $package_name$.config.AppConfig.{GreetingConfig, ServerConfig, WelcomeConfig}
 import pureconfig.ConfigSource
 import pureconfig.generic.auto._
 
@@ -12,6 +12,8 @@ object AppConfigSpec extends Properties {
   override def tests: List[Test] = List(
     property("testServerConfig", testServerConfig),
     property("testInvalidServerConfig", testInvalidServerConfig),
+    property("testWelcomeConfig", testWelcomeConfig),
+    example("testInvalidWelcomeConfig", testInvalidWelcomeConfig),
     property("testGreetingConfig", testGreetingConfig),
     example("testInvalidGreetingConfig", testInvalidGreetingConfig),
     property("testAppConfig", testAppConfig),
@@ -78,6 +80,55 @@ object AppConfigSpec extends Properties {
     }
   }
 
+  def testWelcomeConfig: Property = for {
+    message <- Gens.genNonEmptyString(Gen.alpha, 20).log("message")
+  } yield {
+    final case class ExpectedConfig(
+      welcome: WelcomeConfig
+    )
+    val expected = ExpectedConfig(WelcomeConfig(WelcomeConfig.Message(message)))
+    val config   = ConfigSource.string(
+      s"""
+         |welcome {
+         |  message: "\${message.value}"
+         |}
+         |""".stripMargin
+    )
+    config.load[ExpectedConfig] match {
+      case Right(actual) =>
+        actual ==== expected
+      case Left(failure) =>
+        Result.failure.log(s"\${failure.prettyPrint(2)}")
+    }
+  }
+
+  def testInvalidWelcomeConfig: Result = {
+    final case class ExpectedConfig(
+      welcome: WelcomeConfig
+    )
+    val config   = ConfigSource.string(
+      s"""
+         |welcome {
+         |  message: ""
+         |}
+         |""".stripMargin
+    )
+    config.load[ExpectedConfig] match {
+      case Right(actual) =>
+        Result.failure.log(s"Expected config parse failure but got \${actual.toString}")
+
+      case Left(failure) =>
+        val failureMessage = failure.prettyPrint(2)
+        Result.all(
+          List(
+            Result
+              .assert(failureMessage.contains("welcome.message"))
+              .log("Expected failure at welcome.message but didn't find"),
+          )
+        )
+    }
+  }
+
   def testGreetingConfig: Property = for {
     message <- Gens.genNonEmptyString(Gen.alpha, 20).log("message")
   } yield {
@@ -130,11 +181,13 @@ object AppConfigSpec extends Properties {
   def testAppConfig: Property = for {
     ipString <- Gens.genIpV4.log("ipString")
     portNum  <- Gens.genPortNumber.log("portNum")
-    message  <- Gens.genNonEmptyString(Gen.alpha, 20).log("message")
+    greetingMessage  <- Gens.genNonEmptyString(Gen.alpha, 20).log("greetingMessage")
+    welcomeMessage  <- Gens.genNonEmptyString(Gen.alpha, 20).log("welcomeMessage")
   } yield {
     val expected = AppConfig(
       ServerConfig(ServerConfig.HostAddress(ipString), ServerConfig.PortNumber(portNum)),
-      GreetingConfig(GreetingConfig.Message(message)),
+      GreetingConfig(GreetingConfig.Message(greetingMessage)),
+      WelcomeConfig(WelcomeConfig.Message(welcomeMessage)),
     )
     val config   = ConfigSource.string(
       s"""server {
@@ -142,7 +195,10 @@ object AppConfigSpec extends Properties {
          |  port-number: \${portNum.value}
          |}
          |greeting {
-         |  message: "\${message.value}"
+         |  message: "\${greetingMessage.value}"
+         |}
+         |welcome {
+         |  message: "\${welcomeMessage.value}"
          |}
          |""".stripMargin
     )
@@ -166,6 +222,9 @@ object AppConfigSpec extends Properties {
          |greeting {
          |  message: ""
          |}
+         |welcome {
+         |  message: ""
+         |}
          |""".stripMargin
     )
     config.load[AppConfig] match {
@@ -185,6 +244,9 @@ object AppConfigSpec extends Properties {
             Result
               .assert(failureMessage.contains("greeting.message"))
               .log("Expected failure at greeting.message but didn't find"),
+            Result
+              .assert(failureMessage.contains("welcome.message"))
+              .log("Expected failure at welcome.message but didn't find"),
           )
         )
     }

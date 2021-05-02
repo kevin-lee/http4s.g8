@@ -5,6 +5,7 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Interval
 import eu.timepit.refined.string
 import io.estatico.newtype.macros.newtype
+import io.circe.{Decoder, Encoder}
 
 object Data {
 
@@ -15,6 +16,8 @@ object Data {
 
   @newtype case class Greeting(greeting: String)
   object Greeting {
+    implicit val encoder: Encoder[Greeting] = deriving
+    implicit val decoder: Decoder[Greeting] = deriving
     @newtype case class Message(message: NonEmptyString)
   }
   @newtype case class Name(name: String)
