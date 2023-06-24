@@ -7,7 +7,7 @@ import fs2.Stream
 import $package_name$.core.Data._
 import $package_name$.config.AppConfig
 import $package_name$.service.{Greeter, Welcomer}
-import org.http4s.server.blaze.BlazeServerBuilder
+import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.middleware.Logger
 import org.http4s.syntax.all._
 
