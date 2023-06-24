@@ -1,8 +1,8 @@
 import scala.collection.JavaConverters._
 import java.lang.management.ManagementFactory
 
-ThisBuild / version := "0.1.0"
-ThisBuild / scalaVersion := "2.12.13"
+ThisBuild / version := "0.2.0"
+ThisBuild / scalaVersion := "2.12.18"
 ThisBuild / organization := "io.kevinlee"
 ThisBuild / organizationName := "Kevin's Code"
 ThisBuild / developers := List(
